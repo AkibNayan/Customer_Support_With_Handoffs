@@ -60,6 +60,18 @@ def provide_solution(solution: str) -> str:
     return f"Solution provided: {solution}"
 
 
+@tool
+def go_back_to_warranty() -> Command:
+    """Go back to warranty verification step."""
+    return Command(update={"current_step": "warranty_collector"})
+
+
+@tool
+def go_back_to_classification() -> Command:
+    """Go back to issue classification step."""
+    return Command(update={"current_step": "issue_classifier"})
+
+
 # Define prompts as constants for easy reference
 WARRANTY_COLLECTOR_PROMPT = """You are a customer support agent helping
 with device issues.
@@ -91,20 +103,22 @@ or software issue (app crashes, performance)
 If unclear, ask clarifying questions before classifying
 """
 
-RESOLUTION_SPECIALIST_PROMPT = """You are a customer support agent helping
-with device issues.
+RESOLUTION_SPECIALIST_PROMPT = """You are a customer support agent helping with device issues.
 
 CURRENT STAGE: Resolution
 CUSTOMER INFO: Warranty status is {warranty_status}, issue type is {issue_type}
 
-At this step you need to:
-1. For software issues: provide troubleshooting steps using provide_solution
-2. For hardware issues:
-    - IF IN WARRANTY: explain warranty repair process using provide_solution
-    - IF OUT OF WARRANTY: escalate_to_human for paid repair options
+At this step, you need to:
+1. For SOFTWARE issues: provide troubleshooting steps using provide_solution
+2. For HARDWARE issues:
+   - If IN WARRANTY: explain warranty repair process using provide_solution
+   - If OUT OF WARRANTY: escalate_to_human for paid repair options
 
-Be specific and helpful in your solutions.
-"""
+If the customer indicates any information was wrong, use:
+- go_back_to_warranty to correct warranty status
+- go_back_to_classification to correct issue type
+
+Be specific and helpful in your solutions."""
 
 
 # Step configuration: maps step names to (prompt, tools, required_state)
@@ -112,16 +126,22 @@ STEP_CONFIG = {
     "warranty_collector": {
         "prompt": WARRANTY_COLLECTOR_PROMPT,
         "tools": [record_warranty_status],
-        "requires": []
+        "requires": [],
     },
     "issue_classifier": {
         "prompt": ISSUE_CLASSIFIER_PROMPT,
         "tools": [record_issue_type],
-        "requires": ["warranty_status"]
+        "requires": ["warranty_status"],
     },
     "resolution_specialist": {
         "prompt": RESOLUTION_SPECIALIST_PROMPT,
         "tools": [provide_solution, escalate_to_human],
-        "requires": ["warranty_status", "issue_type"]
-    }
+        "requires": ["warranty_status", "issue_type"],
+    },
 }
+
+
+# Update the resolution_specialist configuration to include these tools
+STEP_CONFIG["resolution_specialist"]["tools"].extend(
+    [go_back_to_warranty, go_back_to_classification]
+)
